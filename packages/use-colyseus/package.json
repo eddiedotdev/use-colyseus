@@ -1,6 +1,6 @@
 {
   "name": "use-colyseus",
-  "version": "0.0.7",
+  "version": "0.1.0",
   "description": "Set of utility React hooks to use Colyseus with React.",
   "license": "MIT",
   "type": "module",
@@ -14,6 +14,10 @@
     "publish-package": "pnpm run build && pnpm publish"
   },
   "author": "Pedro Fontoura",
+  "contributors": [
+    "Pedro Fontoura",
+    "Eddie SanMarco (github.com/eddiedotdev)"
+  ],
   "keywords": [
     "colyseus",
     "multiplayer",
@@ -31,7 +35,8 @@
   "dependencies": {
     "@colyseus/schema": "^2.0.20",
     "colyseus.js": "^0.15.14",
-    "react": "^18.2.0"
+    "react": "^18.2.0",
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",
@@ -45,5 +50,8 @@
     "typescript": "^5.0.2",
     "vite": "^4.4.5",
     "vite-plugin-dts": "^3.5.3"
+  },
+  "peerDependencies": {
+    "zustand": "^4.5.2"
   }
 }

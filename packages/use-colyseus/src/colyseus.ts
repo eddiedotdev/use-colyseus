@@ -1,30 +1,26 @@
 import { Schema } from "@colyseus/schema";
 import { Client, type Room } from "colyseus.js";
-import { useSyncExternalStore } from "react";
+import { create } from "zustand";
 
-import { store } from "./store";
-
-export const colyseus = <S = Schema>(
+export const colyseus = <S extends Schema>(
   endpoint: string,
-  schema?: new (...args: unknown[]) => S
+  schema?: new (...args: unknown[]) => S,
 ) => {
   const client = new Client(endpoint);
-
-  const roomStore = store<Room<S> | undefined>(undefined);
-  const stateStore = store<S | undefined>(undefined);
+  const colyseusStore = useColyseusStore<S>();
 
   let connecting = false;
 
   const connectToColyseus = async (roomName: string, options = {}) => {
-    if (connecting || roomStore.get()) return;
+    if (connecting || colyseusStore.getState().room) return;
 
     connecting = true;
 
     try {
       const room = await client.joinOrCreate<S>(roomName, options, schema);
 
-      roomStore.set(room);
-      stateStore.set(room.state);
+      colyseusStore.getState().setRoom(room);
+      colyseusStore.getState().setState(room.state);
 
       const updatedCollectionsMap: { [key in keyof S]?: boolean } = {};
 
@@ -67,11 +63,11 @@ export const colyseus = <S = Schema>(
           }
         }
 
-        stateStore.set(copy);
+        colyseusStore.getState().setState(copy);
       });
 
       console.log(
-        `Succesfully connected to Colyseus room ${roomName} at ${endpoint}`
+        `Successfully connected to Colyseus room ${roomName} at ${endpoint}`,
       );
     } catch (e) {
       console.error("Failed to connect to Colyseus!");
@@ -82,11 +78,11 @@ export const colyseus = <S = Schema>(
   };
 
   const disconnectFromColyseus = async () => {
-    const room = roomStore.get();
+    const room = colyseusStore.getState().room;
     if (!room) return;
 
-    roomStore.set(undefined);
-    stateStore.set(undefined);
+    colyseusStore.getState().setRoom(undefined);
+    colyseusStore.getState().setState(undefined);
 
     try {
       await room.leave();
@@ -95,34 +91,23 @@ export const colyseus = <S = Schema>(
   };
 
   const useColyseusRoom = () => {
-    const subscribe = (callback: () => void) =>
-      roomStore.subscribe(() => callback());
+    const { room } = colyseusStore((state) => ({
+      room: state.room,
+    }));
 
-    const getSnapshot = () => {
-      const colyseus = roomStore.get();
-      return colyseus;
-    };
-
-    return useSyncExternalStore(subscribe, getSnapshot);
+    return room;
   };
 
-  function useColyseusState(): S | undefined;
-  function useColyseusState<T extends (state: S) => unknown>(
-    selector: T
-  ): ReturnType<T> | undefined;
-  function useColyseusState<T extends (state: S) => unknown>(selector?: T) {
-    const subscribe = (callback: () => void) =>
-      stateStore.subscribe(() => {
-        callback();
-      });
-
-    const getSnapshot = () => {
-      const state = stateStore.get();
-      return state && selector ? selector(state) : state;
-    };
-
-    return useSyncExternalStore(subscribe, getSnapshot);
+  function useColyseusState<T extends (state: S) => S | ReturnType<T> | undefined>(
+    selector?: T,
+  ): S | ReturnType<T> | undefined {
+    const state = colyseusStore((state) => state.state);
+    if (state === undefined) {
+      return undefined;
+    }
+    return selector ? selector(state) : state;
   }
+
 
   return {
     client,
@@ -132,3 +117,18 @@ export const colyseus = <S = Schema>(
     useColyseusState,
   };
 };
+
+interface StateStore<S extends Schema> {
+  room: Room<S> | undefined;
+  state: S | undefined;
+  setRoom: (room: Room<S> | undefined) => void;
+  setState: (state: S | undefined) => void;
+}
+
+export const useColyseusStore = <S extends Schema>() =>
+  create<StateStore<S>>((set) => ({
+    room: undefined,
+    state: undefined,
+    setRoom: (room) => set({ room }),
+    setState: (state) => set({ state }),
+  }));
